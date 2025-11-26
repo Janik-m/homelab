@@ -1,7 +1,8 @@
 # Homelab
 Witaj w dokumentacji mojego domowego laboratorium. Ten projekt służy mi do nauki cyberbezpieczeństwa, automatyzacji procesów w SOC z wykorzystaniem lokalnego AI oraz testowania aplikacji webowych.
 
-<img width="1729" height="782" alt="Wazuh-dashboard" src="https://github.com/user-attachments/assets/28dae554-7a30-48b4-9a3c-79b2c4949e4f" />
+![wazuh](./PNG/wazuh.png)
+![proxmox](./PNG/proxmox.png)
 
 🖥️ Hardware
 
