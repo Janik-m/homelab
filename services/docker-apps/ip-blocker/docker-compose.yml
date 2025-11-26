@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "CHANGE_ME"
+      MYSQL_DATABASE: ipblockdb
+      MYSQL_USER: "CHANGE_ME"
+      MYSQL_PASSWORD: "CHANGE_ME"
+    volumes:
+      - mysqldata:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    ports:
+      - "3306:3306"
+
+  ipblock-backend:
+    build: .
+    restart: always
+    environment:
+      DB_HOST: mysql-db
+      DB_USER: "CHANGE_ME"
+      DB_PASSWORD: "CHANGE_ME"
+      DB_NAME: ipblockdb
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mysql-db
+
+volumes:
+  mysqldata:

@@ -1,0 +1,66 @@
+<!-- Local rules -->
+
+<!-- Modify it at your will. -->
+<!-- Copyright (C) 2015, Wazuh Inc. -->
+
+<group name="local,ssh,authentication_failures,">
+
+  <!-- Reguła 1: Atak brute-force przez zgadywanie hasła -->
+  <rule id="100100" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>5712</if_matched_sid>
+    <same_source_ip />
+    <description>Wykryto atak Brute-Force na SSH (zgadywanie hasla). Ponad 5 nieudanych prob logowania z adresu: $(srcip).</description>
+    <group>authentication_failures,</group>
+  </rule>
+
+  <!-- Reguła 2: Atak przez zgadywanie nazw użytkowników -->
+  <rule id="100101" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>Wykryto atak Brute-Force na SSH (zgadywanie uzytkownikow). Ponad 5 prob logowania z nieistniejacymi uzytkownikami z adresu: $(srcip).</description>
+    <group>authentication_failures,</group>
+  </rule>
+
+</group>
+
+<group name="local,opnsense,firewall,">
+
+  <!-- Reguła wyciszająca alerty dla reguły 81602 -->
+  <rule id="110100" level="0">
+    <if_sid>87702</if_sid>
+      <field name="data.dstip">^192\.168\.0\.255$|^224\.0\.0\.22$|^224\.0\.0\.252$</field>
+    <description>Wyjątek: Wyciszono alert o blokadach OPNsense dla stałych adresów rozgłoszeniowych.</description>
+  </rule>
+
+</group>
+
+<group name="dovecot,">
+
+  <!-- Ignore Dovecot successful IMAP logins/logouts -->
+  <rule id="100200" level="0">
+    <if_sid>9700,9701,9702</if_sid>
+    <match>imap-login: Login:|imap.*: Disconnected:</match>
+    <description>Ignore Dovecot IMAP successful login/logout</description>
+  </rule>
+
+  <!-- Ignore Dovecot ManageSieve logins/logouts -->
+  <rule id="100201" level="0">
+    <if_sid>9700,9701</if_sid>
+    <match>managesieve-login: Login:|managesieve.*: Disconnected:</match>
+    <description>Ignore Dovecot ManageSieve successful operations</description>
+  </rule>
+
+  <!-- Ignore Dovecot POP3 logins (if you use POP3) -->
+  <rule id="100202" level="0">
+    <if_sid>9700,9701</if_sid>
+    <match>pop3-login: Login:|pop3.*: Disconnected:</match>
+    <description>Ignore Dovecot POP3 successful login/logout</description>
+  </rule>
+
+  <!-- Keep alerts for Dovecot ERRORS and authentication FAILURES -->
+  <!-- Default Wazuh rules for failed logins will still trigger alerts -->
+
+</group>
+
+
+

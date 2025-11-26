@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Block Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status-new { color: #0d6efd; font-weight: bold; }
+        .status-existing { color: #198754; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">🛡️ Zarządzanie Blokadami IP</h1>
+
+        <!-- Formularz dodawania -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">Dodaj / Aktualizuj Blokadę</div>
+            <div class="card-body">
+                <form id="addIpForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Adresy IP (jeden pod drugim)</label>
+                        <textarea class="form-control" id="ipAddress" rows="3" placeholder="185.156.177.53&#10;1.2.3.4" required></textarea>
+                    </div>
+                    
+                    <!-- ZMIANA: Wybór czasu trwania zamiast daty -->
+                    <div class="col-md-4">
+                        <label class="form-label">Czas blokady</label>
+                        <select class="form-select" id="blockDuration" required>
+                            <option value="24">24 godziny</option>
+                            <option value="48">48 godzin</option>
+                            <option value="2160">3 miesiące (90 dni)</option>
+                            <option value="4320">6 miesięcy (180 dni)</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Powód</label>
+                        <input type="text" class="form-control" id="reason" placeholder="np. Skanowanie portów">
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-success">Analizuj w n8n</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Panel sterowania -->
+        <div class="card">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <h5 class="m-0">Akcje masowe</h5>
+                <button onclick="manualCleanup()" class="btn btn-warning">🧹 Wyczyść wygasłe blokady (Manual)</button>
+            </div>
+        </div>
+
+        <!-- Tabela wyników -->
+        <div class="card">
+            <div class="card-header">Aktywne Blokady (Baza Danych)</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover table-striped" id="ipTable">
+                        <thead>
+                            <tr>
+                                <th>Adres IP</th>
+                                <th>Blokada do</th>
+                                <th>Powód</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Tutaj wpadną dane z API -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Analizy (Tylko dla NOWYCH adresów) -->
+    <div class="modal fade" id="analysisModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Weryfikacja Nowych Adresów (AbuseIPDB)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>System wykrył nowe adresy. Zweryfikuj je przed zablokowaniem:</p>
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
+                                <th>IP</th>
+                                <th>Score</th>
+                                <th>ISP / Kraj</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysisResultsBody"></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAndSave()">Potwierdź i Zablokuj Wybrane</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // URL do Twojego backendu Flask (pusty = ten sam serwer)
+        const API_URL = ''; 
+        
+        // URL do Webhooka n8n
+        // Użyj /webhook/ dla produkcji lub /webhook-test/ dla testów
+        const N8N_WEBHOOK_URL = 'http://N8N_IP:5678/webhook/analyse-ips'; 
+
+        let pendingData = {}; 
+
+        document.addEventListener('DOMContentLoaded', loadIPs);
+
+        // Funkcja pomocnicza do obliczania daty końcowej
+        function calculateBlockedUntil(hours) {
+            const now = new Date();
+            now.setHours(now.getHours() + parseInt(hours));
+            // Format YYYY-MM-DD HH:MM:SS
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hh}:${mm}:${ss}`;
+        }
+
+        // 1. Pobieranie listy blokad z bazy
+        async function loadIPs() {
+            try {
+                const response = await fetch(`${API_URL}/ips`);
+                const data = await response.json();
+                const tbody = document.querySelector('#ipTable tbody');
+                tbody.innerHTML = '';
+
+                data.forEach(row => {
+                    const blockedDate = new Date(row.blocked_until);
+                    const now = new Date();
+                    const isActive = blockedDate > now;
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${row.ip_address}</strong></td>
+                        <td>${new Date(row.blocked_until).toLocaleString()}</td>
+                        <td>${row.reason || '-'}</td>
+                        <td>
+                            <span class="badge ${isActive ? 'bg-danger' : 'bg-secondary'}">
+                                ${isActive ? 'AKTYWNA' : 'WYGASŁA'}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('Błąd pobierania danych:', error);
+            }
+        }
+
+        // 2. Obsługa formularza (Wysłanie do n8n)
+        document.getElementById('addIpForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const rawIps = document.getElementById('ipAddress').value;
+            const ipList = rawIps.split(/[\n,]+/).map(ip => ip.trim()).filter(ip => ip !== '');
+            
+            if (ipList.length === 0) {
+                alert('Podaj przynajmniej jeden adres IP');
+                return;
+            }
+
+            // Obliczamy datę wygaśnięcia na podstawie wyboru
+            const durationHours = document.getElementById('blockDuration').value;
+            const blockedUntilDate = calculateBlockedUntil(durationHours);
+
+            // Zapisujemy dane formularza globalnie
+            pendingData = {
+                blocked_until: blockedUntilDate,
+                reason: document.getElementById('reason').value
+            };
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerText;
+            btn.innerText = 'Przetwarzanie w n8n...';
+            btn.disabled = true;
+
+            try {
+                // Wysyłka do n8n
+                const response = await fetch(N8N_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ips: ipList })
+                });
+                
+                const result = await response.json();
+                console.log("Odpowiedź z n8n:", result);
+
+                // Obsługa różnych formatów odpowiedzi n8n
+                let items = [];
+                if (Array.isArray(result)) {
+                    items = result;
+                } else if (result.results) {
+                    items = result.results;
+                } else if (result.data) {
+                    items = result.data;
+                } else {
+                    items = [result];
+                }
+
+                const existingIps = items.filter(i => i.status === 'EXISTING').map(i => i.ip);
+                const newIpsItems = items.filter(i => i.status === 'NEW');
+
+                let message = "";
+
+                // A. Automatyczna aktualizacja istniejących
+                if (existingIps.length > 0) {
+                    await saveToBackend(existingIps);
+                    message += `Zaktualizowano automatycznie: ${existingIps.length} adresów (przedłużono o ${durationHours}h).\n`;
+                }
+
+                // B. Decyzja dla nowych (Modal)
+                if (newIpsItems.length > 0) {
+                    showAnalysisModal(newIpsItems);
+                    if (message) alert(message + "Sprawdź nowe adresy w oknie.");
+                } else {
+                    alert(message || "Nie znaleziono nowych adresów, istniejące zaktualizowano.");
+                    loadIPs();
+                    document.getElementById('addIpForm').reset();
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert('Błąd komunikacji z n8n lub błąd parsowania.');
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        // Funkcja zapisująca do Twojego API (Flask)
+        async function saveToBackend(ipsToSave) {
+            const res = await fetch(`${API_URL}/ips`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    ip_addresses: ipsToSave,
+                    blocked_until: pendingData.blocked_until,
+                    reason: pendingData.reason 
+                })
+            });
+            return await res.json();
+        }
+
+        // Wyświetlanie Modala
+        function showAnalysisModal(results) {
+            const tbody = document.getElementById('analysisResultsBody');
+            tbody.innerHTML = '';
+
+            results.forEach(item => {
+                const score = item.score !== undefined ? item.score : 0;
+                // Domyślne zaznaczenie jeśli score > 20
+                const isHighRisk = score > 20; 
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="ip-select form-check-input" value="${item.ip}" ${isHighRisk ? 'checked' : ''}></td>
+                    <td><strong>${item.ip}</strong></td>
+                    <td>
+                        ${score >= 0 ? `<span class="${score > 50 ? 'text-danger fw-bold' : ''}">${score}%</span>` : '-'}
+                    </td>
+                    <td><small class="text-muted">${item.isp || '-'}<br>${item.country || ''}</small></td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('analysisModal'));
+            modal.show();
+        }
+
+        function toggleSelectAll(source) {
+            const checkboxes = document.querySelectorAll('.ip-select');
+            checkboxes.forEach(cb => cb.checked = source.checked);
+        }
+
+        // Zapis nowych po potwierdzeniu w modalu
+        async function confirmAndSave() {
+            const checkboxes = document.querySelectorAll('.ip-select:checked');
+            const selectedIps = Array.from(checkboxes).map(cb => cb.value);
+
+            if (selectedIps.length > 0) {
+                try {
+                    await saveToBackend(selectedIps);
+                    alert('Dodano wybrane adresy do bazy!');
+                } catch(e) {
+                    alert('Błąd zapisu do bazy');
+                }
+            }
+            
+            loadIPs();
+            
+            const modalEl = document.getElementById('analysisModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            modal.hide();
+            document.getElementById('addIpForm').reset();
+        }
+
+        // Manualne czyszczenie
+        async function manualCleanup() {
+            if(!confirm('Czy na pewno usunąć wygasłe wpisy z bazy?')) return;
+            try {
+                const res = await fetch(`${API_URL}/ips/cleanup`, { method: 'POST' });
+                const result = await res.json();
+                alert(`Usunięto ${result.deleted_expired} wygasłych rekordów.`);
+                loadIPs();
+            } catch (error) {
+                alert('Błąd czyszczenia');
+            }
+        }
+    </script>
+</body>
+</html>

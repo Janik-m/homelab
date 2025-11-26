@@ -1,0 +1,357 @@
+{
+  "name": "Wazuh Alert Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alert",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1488,
+        -336
+      ],
+      "id": "c8dded19-583e-4fa2-be78-ede97050a31f",
+      "name": "Webhook",
+      "webhookId": "YOUR_WEBHOOK_ID_HERE"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "foundation-sec-local:latest",
+          "mode": "list",
+          "cachedResultName": "foundation-sec-local:latest"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an Expert Security Analyst (SOC Agent).\nAnalyze this Wazuh Alert JSON:\n{{ JSON.stringify($json) }}\n\nYOUR TASK:\n1. Classify the incident.\n2. Analyze the raw logs and metadata deeply.\n3. Identify the MOST CRITICAL information needed for triage.\n4. Extract exactly 10 key-value pairs that best describe this specific incident.\n5. Add a field \"full_log\" that always contains the complete full/raw log from input JSON.\nOUTPUT JSON STRUCTURE:\n{\n  \"category\": \"WEB_ATTACK\" | \"AUTH_FAIL\" | \"SYSTEM\" | \"UNKNOWN\",\n  \"risk\": \"HIGH\" | \"MEDIUM\" | \"LOW\",\n  \"summary\": \"Expert summary\",\n  \"analysis_reasoning\": \"Why did you choose these fields?\",\n  \"key_details\": {\n    \"field_1_name\": \"value\",\n    \"field_2_name\": \"value\",\n    \"field_3_name\": \"value\",\n    \"field_4_name\": \"value\",\n    \"field_5_name\": \"value\",\n    \"field_6_name\": \"value\"\n    \"field_7_name\": \"value\",\n    \"field_8_name\": \"value\"\n    \"field_9_name\": \"value\",\n    \"field_10_name\": \"value\"\n  }\n  \"full_log\": \"The full value of the full/raw log field from the input JSON.\"\n}\n\nRULES:\n- Keys in key_details should be readable (e.g., \"Attacker_IP\", etc.)\n- Do not include empty/null fields. Find 10 meaningful pieces of info.\n- Return ONLY valid JSON."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        -336
+      ],
+      "id": "ae6c38e8-c494-438e-babc-525f43ed489e",
+      "name": "Message a model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "ID",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Pobierz tekst\nconst inputItem = items[0] ? items[0].json : {};\nlet text = inputItem.content || inputItem.output || JSON.stringify(inputItem);\n\n// Funkcja pomocnicza do wyciągania wartości z JSON-a (nawet zepsutego)\nfunction extract(key) {\n    // Szukamy: \"key\": \"value\"  LUB  \"key\": value\n    const regex = new RegExp(`\"${key}\"\\\\s*:\\\\s*\"?([^\",}]+)\"?`, 'i');\n    const match = text.match(regex);\n    return match ? match[1].trim() : null;\n}\n\n// Funkcja do wyciągania obiektu details (szukamy klamer po \"key_details\")\nfunction extractDetails() {\n    const detailsMatch = text.match(/\"key_details\"\\s*:\\s*{([^}]+)}/s);\n    if (!detailsMatch) return {};\n    \n    const detailsRaw = detailsMatch[1];\n    const detailsObj = {};\n    \n    // Rozbijamy po przecinkach i szukamy par \"klucz\": \"wartość\"\n    const pairs = detailsRaw.split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/); // Split bezpieczny dla cudzysłowów\n    \n    pairs.forEach(pair => {\n        const kv = pair.match(/\"([^\"]+)\"\\s*:\\s*\"?(.*?)\"?\\s*$/);\n        if (kv) {\n            detailsObj[kv[1].trim()] = kv[2].trim().replace(/^\"|\"$/g, ''); // Czyścimy cudzysłowy\n        }\n    });\n    return detailsObj;\n}\n\n// Próbujemy najpierw normalnie (na wypadek gdyby było OK)\ntry {\n    // Oczyszczanie wstępne\n    let cleanText = text;\n    const firstBrace = text.indexOf('{');\n    const lastBrace = text.lastIndexOf('}');\n    if (firstBrace !== -1) cleanText = text.substring(firstBrace, lastBrace + 1);\n    \n    // Próba 1: Parsowanie wprost\n    return { json: JSON.parse(cleanText) };\n} catch (e) {\n    // Próba 2: Jeśli JSON.parse padł, robimy ekstrakcję ręczną (fallback)\n}\n\n// Fallback - Wyciągamy dane Regexem (niezależnie od błędów składni JSON)\nconst fallbackData = {\n    category: extract(\"category\") || \"UNKNOWN\",\n    risk: extract(\"risk\") || \"LOW\",\n    summary: extract(\"summary\") || extract(\"summary_pl\") || \"Analysis available\",\n    analysis_reasoning: extract(\"analysis_reasoning\") || \"See details\",\n    key_details: extractDetails()\n};\n\nreturn { json: fallbackData };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        -336
+      ],
+      "id": "d8cdd031-2717-4613-863e-142fb137feac",
+      "name": "JSON Parser"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "WEB_ATTACK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2674e578-ab5c-47b6-9057-72f2cb6b9459"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "WEB_ATTACK"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4498ac38-e44e-41f5-bb1f-e087d6727f14",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "AUTH_FAIL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "AUTH_FAIL"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4ce6098e-1df1-4416-a0e9-f10c0b7ca0ca",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "UNKNOWN",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "UNKNOWN"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "704bf732-ce23-454d-9dfd-345a5d343702",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "SYSTEM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "SYSTEM"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -768,
+        -368
+      ],
+      "id": "a31306b3-7d54-4354-91c1-5dcb20089c78",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "27K0f4YTD5cBtqsj",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/27K0f4YTD5cBtqsj",
+          "cachedResultName": "WEB_ATTACK"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -752
+      ],
+      "id": "5e901750-4683-4269-84b3-53723122385e",
+      "name": "Call 'WEB_ATTACK'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "BaGwJdtRp8FBPwMB",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/BaGwJdtRp8FBPwMB",
+          "cachedResultName": "AUTH_FAIL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -496
+      ],
+      "id": "e10471ae-9824-494f-8c87-e800974ce1ca",
+      "name": "Call 'AUTH_FAIL'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "5PoNSAq3lsqQRaD1",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/5PoNSAq3lsqQRaD1",
+          "cachedResultName": "SYSTEM"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -80
+      ],
+      "id": "caa0ee0a-e19a-4155-9161-4cba43ff2389",
+      "name": "Call 'SYSTEM'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SyJG53sFx1AuKNQ2",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/SyJG53sFx1AuKNQ2",
+          "cachedResultName": "UNKNOWN"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -288
+      ],
+      "id": "bc9de7fe-ad57-4d92-ad35-f388737a02eb",
+      "name": "Call 'UNKNOWN'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "JSON Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JSON Parser": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Call 'WEB_ATTACK'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'AUTH_FAIL'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'UNKNOWN'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call 'SYSTEM'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "9375a15c-2c25-488f-b512-477c808a798d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "251ddf56bed5a27d9aabce6f41bdaee64af845acca742ed530d007b7354835d4"
+  },
+  "id": "rcWalaiIsfkI71W5",
+  "tags": []
+}
