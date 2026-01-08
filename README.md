@@ -4,25 +4,30 @@ Witaj w dokumentacji mojego domowego laboratorium. Ten projekt służy mi do nau
 ![wazuh](./PNG/wazuh.png)
 ![proxmox](./PNG/proxmox.png)
 
-🖥️ Hardware
+# 🖥️ Hardware (Physical Layer)
 
-Komputer stacjonarny:
+Fizyczna warstwa labu składa się z dwóch niezależnych jednostek, dobranych pod kątem specyficznych ról: wydajności (PC) oraz energooszczędności (RPi).
 
-CPU	     -       Intel Core i9-13900KF	   -     High-performance dla wirtualizacji
+## 1. Core Node: High-Performance Server
+*Stacja robocza pełniąca rolę głównego serwera wirtualizacji.*
 
-RAM	      -            64 GB DDR5	     -       Wystarcza na wiele maszyn VM i LLM
+| Komponent | Specyfikacja | Rola w systemie |
+| :--- | :--- | :--- |
+| **CPU** | **Intel Core i9-13900KF** | Zapewnia ogromną moc obliczeniową dla wielu maszyn wirtualnych (VM) jednocześnie. |
+| **RAM** | **64 GB DDR5** | Pozwala na swobodne alokowanie pamięci dla RAM-żernych usług jak Elastic Stack (Wazuh) czy LLM. |
+| **GPU** | **NVIDIA RTX 4070 SUPER** | Wykorzystywana przez PCI Passthrough do akceleracji inferencji modeli AI (Ollama). |
+| **Storage** | **2TB NVMe SSD** | Błyskawiczny dostęp do danych dla baz logów, obrazów Docker i plików maszyn wirtualnych. |
 
-GPU	    -        NVIDIA RTX 4070 SUPER	-        Passthrough do VM z Ollamą
+## 2. Edge Node: Always-On Server
+*Energooszczędny węzeł brzegowy działający w trybie 24/7.*
 
-Dysk	   -       2TB NVMe SSD	           -     Szybki storage dla baz danych i logów
-
-Raspberry Pi 5:
-
-CPU     -       Broadcom BCM2712 (4-core ARM Cortex-A76)    -    Wydajna jednostka do konteneryzacji (LXC)
-RAM     -       16 GB LPDDR4X                               -    Maksymalna pojemność dla wielu usług (Home Assistant, n8n)
-Storage -       NVMe SSD (via M.2 HAT)                      -    Wysoka przepustowość I/O, brak wąskiego gardła kart SD
-Zasilanie -     UPS Geekworm x1200                          -    Ciągłość działania i bezpieczny shutdown
-
+| Komponent | Specyfikacja | Rola w systemie |
+| :--- | :--- | :--- |
+| **SBC** | **Raspberry Pi 5** (16GB RAM) | Jednostka sterująca automatyką domową. Model 16GB pozwala na swobodną konteneryzację LXC. |
+| **CPU** | **Broadcom BCM2712** | 4-rdzeniowy procesor ARM Cortex-A76, zapewniający skok wydajności w wirtualizacji względem starszych RPi. |
+| **Storage** | **NVMe SSD** (via M.2 HAT) | Eliminuje wąskie gardło kart SD, zapewniając stabilność i szybkość operacji I/O. |
+| **Zasilanie** | **UPS Geekworm x1200** | Gwarantuje ciągłość działania (Safe Shutdown) i monitorowanie zasilania sieciowego. |
+| **Obudowa** | **Metal Case** | Pasywne i aktywne chłodzenie oraz ochrona fizyczna dla dysku i modułu UPS. |
 
 # 🧩 Infrastruktura (Software Stack)
 
