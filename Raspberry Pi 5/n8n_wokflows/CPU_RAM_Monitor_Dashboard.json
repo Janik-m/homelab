@@ -1,0 +1,279 @@
+{
+  "name": "CPU_RAM_Monitor_Dashboard",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "status/pi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -128,
+        -160
+      ],
+      "id": "5bd52694-68c6-4559-97ab-9cba7fcde53e",
+      "name": "Webhook",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "command": "your_command"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        144,
+        -160
+      ],
+      "id": "ce2d8145-57d2-4664-9c2c-581a70e26ca8",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        704,
+        -160
+      ],
+      "id": "1ad86506-ca59-4b18-be97-fe641a4ab881",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f7af023d-cb6a-42a9-b756-b12289decda3",
+                    "leftValue": "={{ $json.critical }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Critical"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.warning }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "a1dbcfa5-4f68-4efd-b06a-d2200593a9a2"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Warning"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "78ffd6dc-a776-411e-b654-b214bc7c3685",
+                    "leftValue": "={{ $json.warning }}",
+                    "rightValue": false,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "false",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Normal"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        944,
+        -176
+      ],
+      "id": "e5010db2-16f5-46df-b08e-d633db7b05e3",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ Parametry przekroczyły progi ostrzegawcze (WARNING).\nNa razie nie jest to stan krytyczny, ale warto obserwować:\n\nTemperatura: {{$json[\"temp\"]}}{{$json[\"temp_unit\"]}} (poprzednio {{$json[\"prevTemp\"]}}{{$json[\"temp_unit\"]}})\nCPU: {{$json[\"cpu\"]}}{{$json[\"cpu_unit\"]}} (poprzednio {{$json[\"prevCpu\"]}}{{$json[\"cpu_unit\"]}})\nRAM: {{$json[\"mem\"]}}{{$json[\"mem_unit\"]}}\n\nUptime: {{$json[\"uptime_pretty\"] || ($json[\"uptime_hours\"] + \" \" + $json[\"uptime_unit\"])}}\n\nNajbardziej obciążający proces:\n• {{$json[\"top_cpu_cmd\"]}} – {{$json[\"top_cpu_usage\"]}}%\n\nZalecane działania:\n• Rzuć okiem na obciążenie (ssh + htop/top).\n• Jeżeli kolejne pomiary nadal będą wysokie, przygotuj się na możliwy restart usług lub maliny.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -160
+      ],
+      "id": "0ea6bd97-1be7-45dc-bc1d-7a1dfcb2ed12",
+      "name": "Discord1",
+      "webhookId": "5add2b21-10c0-48f2-87a4-6e9333bccded",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Odczyt metryk\n// Jeśli dane są już jako pola temp/cpu w $json, użyj ich;\n// jeśli nie, zdekoduj JSON ze stdout z Execute Command.\nlet metrics;\n\nif (typeof $json.temp === 'number' && typeof $json.cpu === 'number') {\n  metrics = $json;\n} else {\n  metrics = JSON.parse($json.stdout);\n}\n\n// Rozbij metryki na zmienne\nconst temp          = metrics.temp;\nconst cpu           = metrics.cpu;\nconst mem           = metrics.mem;\nconst uptime_hours  = metrics.uptime_hours;\nconst uptime_pretty = metrics.uptime_pretty;\nconst top_cpu_cmd   = metrics.top_cpu_cmd;\nconst top_cpu_usage = metrics.top_cpu_usage;\n\n// 2. Dane statyczne workflow (zapamiętanie poprzedniego pomiaru)\nconst state = $getWorkflowStaticData('global');\n\nlet prevCpu  = state.prevCpu  ?? cpu;\nlet prevTemp = state.prevTemp ?? temp;\n\nstate.prevCpu  = cpu;\nstate.prevTemp = temp;\n\n// 3. Progi\nconst WARN_CPU  = 80;\nconst CRIT_CPU  = 95;\nconst WARN_TEMP = 65;\nconst CRIT_TEMP = 75;\n\n// 4. WARNING: tylko gdy TERAZ jednocześnie wysokie CPU i temp\nconst warningNow =\n  (cpu >= WARN_CPU && temp >= WARN_TEMP);\n\n// 5. CRITICAL: wysokie CPU i temp TERAZ i POPRZEDNIO\nconst critical =\n  (cpu  >= CRIT_CPU  && prevCpu  >= CRIT_CPU) &&\n  (temp >= CRIT_TEMP && prevTemp >= CRIT_TEMP);\n\n// 6. WARNING tylko jeśli nie ma CRITICAL\nconst warning = warningNow && !critical;\n\n// 7. Zwróć dalej wszystkie dane + flagi\nreturn [\n  {\n    ...metrics,\n    prevCpu,\n    prevTemp,\n    warning,\n    critical,\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -160
+      ],
+      "id": "710a2446-63e8-449f-8e37-939de4fba8e2",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ Parametry przekroczyły progi krytyczne i mogą wpływać na stabilność działania.\nZalecane działania:\n• Sprawdź procesy na Pi5 (np. ssh + htop/top) i ogranicz obciążenie.\n• Zweryfikuj temperaturę obudowy i pracę chłodzenia.\n• Rozważ restart usług lub samej maliny, jeśli wartości utrzymują się dłużej.\n\n🧯 Raspberry Pi 5 – ALARM (CRITICAL)\n\nTemperatura: {{$json[\"temp\"]}}{{$json[\"temp_unit\"]}} (poprzednio {{$json[\"prevTemp\"]}}{{$json[\"temp_unit\"]}})\nCPU: {{$json[\"cpu\"]}}{{$json[\"cpu_unit\"]}} (poprzednio {{$json[\"prevCpu\"]}}{{$json[\"cpu_unit\"]}})\nRAM: {{$json[\"mem\"]}}{{$json[\"mem_unit\"]}}\n\nUptime: {{$json[\"uptime_pretty\"] || ($json[\"uptime_hours\"] + \" \" + $json[\"uptime_unit\"])}}\n\nNajbardziej obciążający proces:\n• {{$json[\"top_cpu_cmd\"]}} – {{$json[\"top_cpu_usage\"]}}%\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        -352
+      ],
+      "id": "f0c19855-66d2-4482-9a19-7a4148d055d9",
+      "name": "Discord",
+      "webhookId": "812bc2b6-1a70-491d-9839-2c45e73823b5",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Discord",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discord1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4f4a38af-f910-42c9-bef5-a8c592e62cdd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "97267686bb3382a990e8cffa413369c04e5f3b1bad849aef8c4d5a41864ea4f4"
+  },
+  "id": "I4nA6hceFBZUgo0r",
+  "tags": []
+}

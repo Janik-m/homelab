@@ -1,0 +1,301 @@
+{
+  "name": "WoL lab",
+  "nodes": [
+    {
+      "parameters": {
+        "command": "ANONYMIZED_COMMAND"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        -144
+      ],
+      "id": "a9ff1f9d-d853-4015-8869-683c56f149bb",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9d20f81e-bee3-4f26-b78f-f04dfc46ce38",
+              "leftValue": "={{ $json.stdout }}",
+              "rightValue": "down",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -752,
+        -144
+      ],
+      "id": "e4fd0eef-16f3-49de-84bb-b760231832eb",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "command": "/home/user/WoL/wol-proxmox.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -384
+      ],
+      "id": "4183b6a7-250a-4a04-a58f-227158989bf9",
+      "name": "Execute a command1",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "Lab jest już włączony",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        464,
+        272
+      ],
+      "id": "67c3d1d9-2513-4e7b-8d32-87bacabca234",
+      "name": "Discord",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "minutes"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -256,
+        -384
+      ],
+      "id": "c685e5d4-04e0-4c09-847c-9e762635d4ec",
+      "name": "Wait",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "Lab uruchomiony",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -48
+      ],
+      "id": "0e5dfa87-cccb-4d09-9462-d4bc1681f5e3",
+      "name": "Discord1",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3c7b203e-751a-4397-8089-97ae2b8555a4",
+              "leftValue": "={{ $json.stdout }}",
+              "rightValue": "up",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        -384
+      ],
+      "id": "616b003a-daab-4e16-a275-c9b41f29daf7",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "command": "=/home/user/WoL/status-proxmox.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        -384
+      ],
+      "id": "5fc3f137-6cc1-4cd1-b1bd-27f25a0baaf7",
+      "name": "Execute a command2",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "proxmox",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1248,
+        -144
+      ],
+      "id": "91d71040-62f4-44f3-8b0f-23192277b068",
+      "name": "Webhook",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Execute a command1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Execute a command2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Discord1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command2": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ANONYMIZED_WEBHOOK_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ANONYMIZED_WEBHOOK_ID"
+  },
+  "id": "MEQ7OKgKj7TaBF5T",
+  "tags": []
+}

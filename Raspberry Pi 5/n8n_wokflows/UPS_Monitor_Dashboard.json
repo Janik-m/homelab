@@ -1,0 +1,321 @@
+{
+  "name": "UPS_Monitor_Dashboard",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "status/ups",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -688,
+        32
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Webhook",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "command": "cat /run/x120x_upsd.json"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        32
+      ],
+      "id": "c96ea32d-d9b4-49e9-a946-41ca292605f0",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// input: jedno pole \"data\" z linią JSON ze stdout\nconst line = $json[\"stdout\"] || '';\nreturn [{\n  json: JSON.parse(line)\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -272,
+        32
+      ],
+      "id": "05d3c125-388c-47ef-b32d-4aaee97fb6f6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -64,
+        32
+      ],
+      "id": "75bd8752-40ce-4a42-8e23-50b1cfde279c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ **UPS – zanik zasilania**\n\n• Stan: **brak zasilania sieciowego** – system pracuje na baterii.  \n• Poziom baterii: {{$json.current_capacity}}%\n• Napięcie: {{$json.current_voltage}} V\n\nProxmox i kontenery działają normalnie.  \nPrzy poziomie baterii **30%** rozpocznie się wyłączanie kontenerów LXC.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        560,
+        192
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Discord",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=@here 🛑 **UPS – wyłączanie kontenerów LXC**\n\n• Stan: **brak zasilania sieciowego**, niski poziom baterii.  \n• Poziom baterii: `{{$json.current_capacity}}%`  \n• Napięcie: `{{$json.current_voltage}} V`  \n\nRozpoczynam wyłączanie kontenerów LXC na Proxmox:  \nopnVPN, AdGuard, N8N  \n\nPrzy poziomie baterii **20%** zostanie wyłączony cały host Proxmox (Raspberry Pi).\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -64
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Discord1",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "sudo /home/user/monitoring/ups.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -64
+      ],
+      "id": "3b09ef68-9506-4f58-b61f-96a7a4e2e532",
+      "name": "Execute a command1",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a50abefd-d182-4315-90df-fcfb0fcc2f82",
+              "leftValue": "={{ $json.charger_present }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "11ad4e81-dd0f-45d9-88f5-c75dff127c5b",
+              "leftValue": "={{ $json.current_capacity }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            },
+            {
+              "id": "b44c9457-9812-4629-97c7-d426318e06c7",
+              "leftValue": "={{ $json.current_capacity }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        288,
+        208
+      ],
+      "id": "4b0cf3f4-0941-4306-881e-c8bf6eef6539",
+      "name": "WARNING"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c347a7f6-c8d1-430c-b7c7-ea432fb27d46",
+              "leftValue": "={{ $json.charger_present }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "4b713b8d-0c96-4cf7-9c24-24567ea40857",
+              "leftValue": "={{ $json.current_capacity }}",
+              "rightValue": 30,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        272,
+        -48
+      ],
+      "id": "2e3c8b5f-7cc9-4536-a503-1a027c8430ed",
+      "name": "LXC - down"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Discord1": {
+      "main": [
+        [
+          {
+            "node": "Execute a command1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WARNING": {
+      "main": [
+        [
+          {
+            "node": "Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LXC - down": {
+      "main": [
+        [
+          {
+            "node": "Discord1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "LXC - down",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WARNING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ANONYMIZED_WEBHOOK_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ANONYMIZED_WEBHOOK_ID"
+  },
+  "id": "uMgeof5hXYuSNrXv",
+  "tags": []
+}

@@ -1,0 +1,171 @@
+{
+  "name": "backup_malyna",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "backup",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        16
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Webhook",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID"
+    },
+    {
+      "parameters": {
+        "command": "sudo /home/user/backup_script/backup_proxmox_port.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        -256,
+        16
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Execute a command",
+      "credentials": {
+        "sshPassword": {
+          "id": "DqvHit02g1Twmj0Y",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ANONYMIZED_WEBHOOK_ID",
+              "leftValue": "={{ $json[\"stdout\"].includes(\"BACKUP_OK\") && $json[\"code\"] === 0 }}\n",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -48,
+        16
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=✅ Backup Proxmox-port zakończony pomyślnie\n\nKontenery: 100, 101, 102\nLokalizacja backupu: /mnt/lab-backup/proxmox-port\n\nHost: host\nCzas wykonania (n8n): {{$now}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -80
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Discord",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=❌ Błąd backupu Proxmox-port\n\nKod wyjścia: {{$json[\"code\"]}}\nOutput:\n{{$json[\"stdout\"] || 'brak danych'}}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        160,
+        112
+      ],
+      "id": "ANONYMIZED_WEBHOOK_ID",
+      "name": "Discord1",
+      "webhookId": "ANONYMIZED_WEBHOOK_ID",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "dFqxSFqWAO4FFfo6",
+          "name": "Discord Webhook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute a command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a command": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Discord",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discord1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ANONYMIZED_WEBHOOK_ID",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ANONYMIZED_WEBHOOK_ID"
+  },
+  "id": "ANONYMIZED_WEBHOOK_ID",
+  "tags": []
+}
