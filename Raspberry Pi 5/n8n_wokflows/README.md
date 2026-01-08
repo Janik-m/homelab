@@ -1,1 +1,1 @@
-![n8n](./PNG/n8n_workflow.png)
+![n8n](/PNG/n8n_workflow.png)
