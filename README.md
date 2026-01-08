@@ -75,5 +75,4 @@ Fizyczna warstwa labu składa się z dwóch niezależnych jednostek, dobranych p
 
 ### 🌐 Usługi Sieciowe (LXC)
 *   **AdGuard Home:** DNS Sinkhole blokujący reklamy i śledzenie dla całej sieci domowej (24/7).
-*   **OpenVPN (Brama Zapasowa):** Tunel "Always-On" zapewniający dostęp do sieci domowej z zewnątrz w każdej sytuacji.
-*   **Postfix:** Niezależny serwer SMTP do wysyłania krytycznych alertów systemowych.
+*   **OpenVPN:** Tunel "Always-On" zapewniający dostęp do sieci domowej z zewnątrz w każdej sytuacji.
