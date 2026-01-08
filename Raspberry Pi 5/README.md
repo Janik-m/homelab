@@ -38,6 +38,5 @@ Instancja n8n służy jako "mózg" operacyjny, łączący:
 1. Webhooki z Home Assistant.
 2. Zewnętrzne API modeli LLM (OpenAI/Anthropic/Lokalne modele).
 3. Powiadomienia o incydentach bezpieczeństwa.
-
+![n8n](/PNG/n8n_workflow.png)
 ---
-*Repozytorium: Część projektu CyberSec HomeLab.*
