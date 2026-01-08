@@ -1,67 +1,34 @@
 # 🌐 Network Architecture
 
-Moja sieć opiera się na wirtualizacji (SDN - Software Defined Networking) wewnątrz Proxmoxa, wykorzystując tylko jeden fizyczny interfejs sieciowy (Single NIC Architecture).
+Architektura sieci to hybryda klasycznej sieci płaskiej (Home Network) oraz izolowanej strefy wirtualnej (Lab Network). Dzięki temu krytyczne usługi domowe (DNS, Smart Home) są łatwo dostępne dla domowników, podczas gdy wrażliwe środowisko testowe jest odseparowane firewallem.
 
-## 🗺️ Topology Diagram
+### 🗺️ Topologia Sieci
 
-Poniższy schemat przedstawia przepływ ruchu sieciowego. Fizyczny router domowy "nie widzi" co dzieje się wewnątrz Labu – widzi tylko interfejs WAN OPNsense.
+Ruch sieciowy odbywa się w dwóch głównych segmentach:
+1.  **Strefa Zaufana (Home):** Dostępna bezpośrednio z routera fizycznego. Tu znajdują się urządzenia fizyczne oraz usługi "produkcyjne" (DNS, Pliki).
+2.  **Strefa Izolowana (Lab):** Wirtualna sieć za NAT-em OPNsense. Tu znajdują się narzędzia Security i AI, chronione przed przypadkowym dostępem z sieci domowej.
 
+---
 
-```mermaid
-graph TD
-    subgraph Physical[Fizyczna Sieć Domowa]
-        ISP[Internet / Router ISP] -->|192.168.1.x| PHY_NIC[Fizyczna Karta Sieciowa]
-    end
+### 🛡️ Segmentacja Sieci (Network Segmentation)
 
-    subgraph Proxmox[Proxmox Host]
-        PHY_NIC --- VMBR0[vmbr0 - Linux Bridge WAN]
-        
-        subgraph OPNsense_VM[VM: OPNsense Firewall]
-            VMBR0 -.->|vtnet0 WAN| FW_WAN[Interfejs WAN]
-            FW_LAN[Interfejs LAN] -.->|vtnet1 LAN| VMBR1
-            FW_OVPN[OpenVPN Server] -.-> FW_WAN
-        end
-        
-        VMBR1[vmbr1 - Izolowany Bridge LAN]
-        
-        VMBR1 --- Wazuh[VM: Wazuh SIEM]
-        VMBR1 --- Ollama[VM: Ollama AI]
-        VMBR1 --- Docker[VM: Docker Apps]
-        VMBR1 --- N8N[CT: n8n Automation]
-    end
+| Nazwa Strefy | Adresacja (CIDR) | Urządzenia / Usługi | Opis i Rola |
+| :--- | :--- | :--- | :--- |
+| **HOME LAN** | `192.168.0.0/24` | • Router ISP (Brama)<br>• **Raspberry Pi 5** (Całość)<br>• **Proxmox Host** (Mgmt IP)<br>• **File Server** (LXC na PC) | Główna sieć domowa. Usługi tutaj muszą być dostępne dla każdego domownika (np. AdGuard) lub służą do wymiany plików (Backup). |
+| **SEC LAB** | `192.168.100.0/24` | • **Wazuh SIEM**<br>• **Ollama AI**<br>• **Docker Security** | Izolowany poligon. Brak bezpośredniego routingu z HOME LAN. Wyjście na świat tylko przez OPNsense (Double NAT). |
+| **VPN TUNNEL** | `10.0.100.0/24` | • Klient Administratora | Szyfrowany tunel pozwalający na bezpieczne "wbicie się" do strefy SEC LAB z poziomu HOME LAN lub Internetu. |
 
-    subgraph Admin_Workstation[Laptop Admina]
-        WinVM[VM: Windows 11 Secure] -.->|OpenVPN Client| FW_OVPN
-    end
+---
 
-    WinVM -.->|SSH i HTTPS via Tunnel| VMBR1
-    
-    style OPNsense_VM fill:#f96,stroke:#333,stroke-width:2px
-    style VMBR1 fill:#bbf,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
-    style WinVM fill:#bfb,stroke:#333,stroke-width:2px
-```
+### 🧱 Firewall & Routing (OPNsense)
 
+Wirtualny router OPNsense (na maszynie VM wewnątrz PC) pełni rolę strażnika strefy Lab.
 
+**Kluczowe zasady ruchu:**
+1.  **File Server (Wyjątek):** Mimo że działa na PC, jest wystawiony w sieci `192.168.0.x`, aby Raspberry Pi mogło robić na nim backupy bez konieczności zestawiania tuneli VPN.
+2.  **Izolacja Labu:** Urządzenia z sieci domowej (TV, telefony) "nie widzą" serwerów Wazuha czy AI. Zapobiega to przypadkowym infekcjom lub wyciekom z testowanego środowiska.
+3.  **Dostęp Administracyjny:** Aby zarządzać Wazuhem, admin musi połączyć się przez OpenVPN – nawet będąc fizycznie w domu.
 
-## 🛡️ Network Segmentation
-
-| Interfejs | Typ | Bridge | Podsieć (CIDR) | Opis |
-| :--- | :--- | :--- | :--- | :--- |
-| **WAN** | Virtual | `vmbr0` | 192.168.1.0/24 | Uplink do domowego routera. OPNsense pobiera tu IP przez DHCP. |
-| **LAN (Lab)** | Virtual | `vmbr1` | 192.168.100.0/24 | **Izolowana strefa.** Brak fizycznego wyjścia. Cały ruch musi przejść przez firewall OPNsense. |
-| **OpenVPN** | Tunnel | `tun0` | 10.0.100.0/24 | Sieć dla zdalnych klientów (admina). |
-
-## 🔐 Firewall & Routing (OPNsense)
-
-Ponieważ Proxmox i OPNsense dzielą ten sam sprzęt, konfiguracja wymagała ostrożności, aby nie odciąć dostępu do GUI Proxmoxa.
-
-### Kluczowe reguły Firewall:
-1.  **Block RFC1918 on WAN:** Wyłączone (bo WAN jest w sieci prywatnej 192.168.1.x).
-2.  **Allow OpenVPN to LAN:** Zezwolenie na ruch z tunelu 10.0.100.0/24 do sieci Lab 192.168.100.0/24.
-3.  **Izolacja IoT:** (Jeśli planujesz w przyszłości) - zablokowanie ruchu z Labu do domowej sieci 192.168.1.x (z wyjątkiem bramy).
-
-### Dostęp Zdalny (OpenVPN)
-Zamiast wystawiać porty SSH każdej maszyny na świat, wystawiony jest tylko jeden port UDP dla OpenVPN.
-- **Klient:** OpenVPN Connect.
-- **Auth:** Certyfikat użytkownika + TLS Key.
-
+### 🔌 Fizyczne Połączenia
+*   **PC Server:** Podpięty kablem ETH. Obsługuje dwie wirtualne karty sieciowe: jedną dla sieci domowej (bridge do File Servera i Mgmt), drugą prywatną dla Labu.
+*   **Raspberry Pi:** Podpięte kablem ETH. Działa w pełni w sieci domowej, służąc jako stabilny punkt dostępowy DNS (AdGuard) dla wszystkich urządzeń w domu.
