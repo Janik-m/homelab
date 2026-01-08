@@ -1,0 +1,131 @@
+{
+  "name": "Sanitize AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sanitize",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -560,
+        16
+      ],
+      "id": "4987cd46-5c77-4f98-be9c-dcbb8327479d",
+      "name": "Webhook",
+      "webhookId": "73783736-6f48-4a93-b1fe-204f239d5263"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Iterujemy po wszystkich elementach wejściowych (nawet jeśli jest tylko jeden)\nreturn items.map(item => {\n  // Sprawdźmy, czy binary data istnieje\n  if (!item.binary) {\n    return { json: { error: 'No binary data found' } };\n  }\n\n  // Szukamy pierwszego klucza w binary (niezależnie czy to 'data', 'data0' czy 'file')\n  const binaryKey = Object.keys(item.binary)[0];\n  const binaryData = item.binary[binaryKey];\n\n  // Jeśli plik jest pusty lub go nie ma\n  if (!binaryData) {\n     return { json: { error: 'Binary object empty' } };\n  }\n\n  // Pobieramy zawartość jako tekst (Base64 -> String)\n  // W Code Node n8n v1+ binaryData jest już często dostępny jako wskaźnik\n  // Ale najbezpieczniej użyć wbudowanej metody konwersji bufferów:\n  const content = Buffer.from(binaryData.data, 'base64').toString('utf8');\n\n  return {\n    json: {\n      file_content: content,\n      filename: binaryData.fileName\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        16
+      ],
+      "id": "20219cfe-1a29-4971-ae54-5f7c5b77c5b4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "qwen2.5:3b",
+          "mode": "list",
+          "cachedResultName": "qwen2.5:3b"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Role: You are a Senior DevSecOps Engineer specialized in code sanitization.\n\nTask: Anonymize the provided code snippet by redacting all sensitive information.\n\nInstructions:\n1. IDENTIFY sensitive data: passwords, API keys, secrets, tokens, public IP addresses, email addresses, usernames, and absolute file paths.\n2. REPLACE them with generic placeholders: <PASSWORD>, <API_KEY>, <SECRET>, <IP_ADDRESS>, <EMAIL>, <USERNAME>, <PATH>.\n3. STRICTLY PRESERVE the original code structure, indentation, variable names, and logic. Only values should change.\n4. OUTPUT FORMAT: Return ONLY the sanitized code block. Do not include markdown code fences (```), explanations, or conversational filler.\n\nINPUT CODE:\n{{ $json.file_content }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        16
+      ],
+      "id": "85f2a853-a8e2-4ef5-8133-910cd0702dbb",
+      "name": "Message a model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "57nQHHaKAH7H3P9n",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.content }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        256,
+        16
+      ],
+      "id": "df395672-aaed-4f13-895a-b38872b1e494",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c160c345-1bab-4d33-b71e-f98f58015a55",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "97267686bb3382a990e8cffa413369c04e5f3b1bad849aef8c4d5a41864ea4f4"
+  },
+  "id": "jG4T8xJidbgO4YX3",
+  "tags": []
+}
